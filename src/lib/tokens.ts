@@ -153,6 +153,25 @@ export function formatUsdish(value: number): string {
   return value.toLocaleString("en-US", { maximumFractionDigits: 4 });
 }
 
+/**
+ * Compact rendering for raw liquidity (L) bigints. L is sqrt(x*y) in raw
+ * token units, so real pools land around 1e30-1e40 — a plain toString() is
+ * a 30+ digit wall. Values under 1,000,000 render in full with separators;
+ * larger ones render as a short exponential ("3.69e33", 3 significant
+ * figures). Call sites keep the exact value in a `title` tooltip.
+ */
+export function formatLiquidity(value: bigint): string {
+  if (value === 0n) return "0";
+  const negative = value < 0n;
+  const digits = (negative ? -value : value).toString();
+  if (digits.length <= 6) {
+    return Number(value).toLocaleString("en-US");
+  }
+  const exponent = digits.length - 1;
+  const mantissa = `${digits[0]}.${digits.slice(1, 3)}`.replace(/\.?0+$/, "");
+  return `${negative ? "-" : ""}${mantissa}e${exponent}`;
+}
+
 /** Parse a human amount into raw units, or null when invalid. */
 export function parseAmount(input: string, decimals: number): bigint | null {
   const trimmed = input.trim();
