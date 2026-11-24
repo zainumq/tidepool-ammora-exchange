@@ -410,6 +410,21 @@ code,
   color: #fca5a5;
   font-size: 0.9rem;
 }
+
+/* Price-impact tiers: amber above 1%, red above 5%. Warning only. */
+.impact-warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+.impact-danger {
+  color: #fca5a5;
+  font-weight: 600;
+}
+p.impact-warn,
+p.impact-danger {
+  margin: 4px 0;
+  font-size: 0.9rem;
+}
 .wallet-error-box {
   margin-top: 12px;
 }
