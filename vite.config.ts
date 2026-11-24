@@ -37,6 +37,11 @@ import { defineConfig } from 'vite'
  * live site — 12 minutes after the fix commit the live bundle was still
  * the batch-4 build with the old 2^96 divisor. This comment re-triggered
  * a clean deploy run for the full tree.
+ *
+ * Deploy note 6 (24 Nov 2026): same race again — the two formatLiquidity
+ * commits (tokens.ts + PoolList.tsx) did not reach the live site; the
+ * live bundle stayed on the priceFromSqrt build. This comment re-triggered
+ * a clean deploy run for the full tree.
  */
 
 // https://vite.dev/config/
