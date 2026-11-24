@@ -18,6 +18,8 @@ import {
   shortAddress,
   type TokenInfo,
 } from "../lib/tokens";
+import { usePagination } from "../lib/pagination";
+import { Pagination } from "./Pagination";
 import { executePlan } from "../lib/tx";
 import { getWalletClient } from "../lib/client";
 import {
@@ -106,6 +108,8 @@ export function PoolList({
     });
   }, [pools, query, tokenInfos]);
 
+  const pager = usePagination(filtered.length, query);
+
   return (
     <div className="panel">
       <div className="panel-head">
@@ -151,7 +155,7 @@ export function PoolList({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((p) => {
+            {pager.slice(filtered).map((p) => {
               const base = tokenInfos.get(p.baseToken.toLowerCase());
               const quote = tokenInfos.get(p.quoteToken.toLowerCase());
               const state = states.get(p.pool.toLowerCase());
@@ -230,6 +234,13 @@ export function PoolList({
           </tbody>
         </table>
       </div>
+      <Pagination
+        page={pager.page}
+        pageCount={pager.pageCount}
+        total={filtered.length}
+        pageSize={pager.pageSize}
+        onPage={pager.setPage}
+      />
 
       {selected && (
         <PoolDetail
