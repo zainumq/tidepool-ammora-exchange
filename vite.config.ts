@@ -31,6 +31,12 @@ import { defineConfig } from 'vite'
  * batch-4 push — the live site served an intermediate build (new
  * index.html with OG tags, old JS/CSS). This comment re-triggered a
  * clean deploy run for the full tree.
+ *
+ * Deploy note 5 (24 Nov 2026): the priceFromSqrt fix commit (a836fbab)
+ * and the real tidepool-og.png commit (81fda9d) both failed to reach the
+ * live site — 12 minutes after the fix commit the live bundle was still
+ * the batch-4 build with the old 2^96 divisor. This comment re-triggered
+ * a clean deploy run for the full tree.
  */
 
 // https://vite.dev/config/
