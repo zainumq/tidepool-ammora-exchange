@@ -12,6 +12,10 @@ import {
 } from "viem";
 import { erc20Abi } from "./chain";
 import { publicClient } from "./client";
+import {
+  WALLET_REQUEST_TIMEOUT_MS,
+  withWalletTimeout,
+} from "./walletError";
 
 export interface PlannedTransaction {
   to: Address;
@@ -22,25 +26,44 @@ export interface PlannedTransaction {
 export type TxStatusCallback = (message: string) => void;
 
 export async function waitReceipt(hash: Hash) {
-  return publicClient.waitForTransactionReceipt({ hash });
+  try {
+    return await publicClient.waitForTransactionReceipt({
+      hash,
+      timeout: 120_000,
+    });
+  } catch {
+    // Keep the hash: the transaction may still confirm, and retrying
+    // blindly could double-send.
+    throw new Error(
+      `Submitted (tx ${hash}) but no confirmation within 120s. Check the explorer before retrying — the transaction may still confirm.`,
+    );
+  }
 }
 
 /**
  * Send one planned transaction from the connected wallet and wait for its
  * receipt. Throws when the receipt status is reverted.
+ *
+ * The wallet signature request is the hang-prone step (a popup that never
+ * appears used to hang forever). It fails visibly after the timeout
+ * instead; the retry hint tells the user to check MetaMask's queue first,
+ * because timing out cannot cancel a request already queued in the wallet.
  */
 export async function sendPlanned(
   wallet: WalletClient,
   account: Address,
   tx: PlannedTransaction,
 ): Promise<Hash> {
-  const hash = await wallet.sendTransaction({
-    account,
-    chain: wallet.chain ?? undefined,
-    to: tx.to,
-    data: tx.data,
-    value: tx.value ?? 0n,
-  });
+  const hash = await withWalletTimeout(
+    wallet.sendTransaction({
+      account,
+      chain: wallet.chain ?? undefined,
+      to: tx.to,
+      data: tx.data,
+      value: tx.value ?? 0n,
+    }),
+    WALLET_REQUEST_TIMEOUT_MS,
+  );
   const receipt = await waitReceipt(hash);
   if (receipt.status === "reverted") {
     throw new Error(`Transaction reverted: ${hash}`);
