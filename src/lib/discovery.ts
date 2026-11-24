@@ -70,6 +70,7 @@ export interface EnrichedLaunch extends LaunchRecord {
 
 const LAUNCH_CACHE_KEY = "tidepool.launches.v1";
 const POOL_CACHE_KEY = "tidepool.pools.v1";
+const POOL_CHECKPOINT_KEY = "tidepool.pools.checkpoint.v1";
 
 interface LaunchCache {
   lastBlock: string;
@@ -116,6 +117,12 @@ export async function scanLaunches(
   const head = await publicClient.getBlockNumber();
   const fromBlock = BigInt(cache.lastBlock) + 1n;
   const found = [...cache.launches];
+
+  // Chunks the cache already covers, so the progress bar reflects the
+  // resumed position instead of restarting at 0 on every refresh.
+  const cachedSpan = BigInt(cache.lastBlock) - START_BLOCK + 1n;
+  const baseChunks =
+    cachedSpan > 0n ? Number((cachedSpan + LOG_CHUNK - 1n) / LOG_CHUNK) : 0;
 
   if (fromBlock > head) return found;
 
@@ -164,7 +171,7 @@ export async function scanLaunches(
       }
     }
     done += batch.length;
-    onProgress?.({ done, total: ranges.length, found: found.length });
+    onProgress?.({ done: baseChunks + done, total: baseChunks + ranges.length, found: found.length });
     // Advance the cache only over fully successful batches, in order.
     if (batchOk) {
       const lastTo = batch[batch.length - 1][1];
@@ -266,18 +273,24 @@ function readPoolCache(): PoolCache | null {
   }
 }
 
+type SerializedPool = PoolCache["pools"][number];
+
+function serializePools(pools: readonly DiscoveredPool[]): SerializedPool[] {
+  return pools.map((p) => ({
+    model: p.model,
+    pool: p.pool,
+    baseToken: p.baseToken,
+    quoteToken: p.quoteToken,
+    factory: p.factory,
+    creationBlock: p.creationBlock.toString(),
+  }));
+}
+
 function writePoolCache(pools: readonly DiscoveredPool[], atBlock: bigint): void {
   try {
     const cache: PoolCache = {
       atBlock: atBlock.toString(),
-      pools: pools.map((p) => ({
-        model: p.model,
-        pool: p.pool,
-        baseToken: p.baseToken,
-        quoteToken: p.quoteToken,
-        factory: p.factory,
-        creationBlock: p.creationBlock.toString(),
-      })),
+      pools: serializePools(pools),
     };
     localStorage.setItem(POOL_CACHE_KEY, JSON.stringify(cache));
   } catch {
@@ -304,23 +317,117 @@ function rehydratePoolCache(cached: PoolCache): DiscoveredPool[] {
 }
 
 /**
+ * In-progress checkpoint for the factory-log pool scan: the last fully
+ * scanned block, how many chunks that covers, and the pools found so far.
+ * Written after each fully successful batch so a reload resumes instead of
+ * restarting the whole ~660-chunk walk. Checkpointed pools are partial
+ * results, never presented as a complete scan — only a scan that finishes
+ * writes the pool cache (see discoverPools), and the checkpoint is cleared
+ * when it does.
+ */
+interface PoolCheckpoint {
+  lastBlock: string;
+  chunksDone: number;
+  pools: SerializedPool[];
+}
+
+function readPoolCheckpoint(): PoolCheckpoint | null {
+  try {
+    const raw = localStorage.getItem(POOL_CHECKPOINT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PoolCheckpoint;
+    if (
+      typeof parsed.lastBlock !== "string" ||
+      !/^\d+$/.test(parsed.lastBlock) ||
+      typeof parsed.chunksDone !== "number" ||
+      !Number.isInteger(parsed.chunksDone) ||
+      parsed.chunksDone < 0 ||
+      !Array.isArray(parsed.pools) ||
+      parsed.pools.some(
+        (p) =>
+          typeof p?.model !== "string" ||
+          typeof p?.pool !== "string" ||
+          typeof p?.baseToken !== "string" ||
+          typeof p?.quoteToken !== "string" ||
+          typeof p?.factory !== "string" ||
+          typeof p?.creationBlock !== "string" ||
+          !/^\d+$/.test(p.creationBlock),
+      )
+    ) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writePoolCheckpoint(
+  lastBlock: bigint,
+  chunksDone: number,
+  pools: readonly DiscoveredPool[],
+): void {
+  try {
+    const checkpoint: PoolCheckpoint = {
+      lastBlock: lastBlock.toString(),
+      chunksDone,
+      pools: serializePools(pools),
+    };
+    localStorage.setItem(POOL_CHECKPOINT_KEY, JSON.stringify(checkpoint));
+  } catch {
+    /* ignore cache failures */
+  }
+}
+
+function clearPoolCheckpoint(): void {
+  try {
+    localStorage.removeItem(POOL_CHECKPOINT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
  * Fallback pool discovery: scan `PoolCreated` on both ARL factories. The
  * event args carry pool/base/quote, so this needs no per-pool verification
  * call — it succeeds even when the SDK's authenticated discovery throws on a
  * malformed candidate. `complete` is false when a chunk failed, in which case
  * the caller must not cache the (partial) result.
+ *
+ * The scan resumes from the last checkpoint (`tidepool.pools.checkpoint.v1`)
+ * instead of restarting from the deployment block: progress is checkpointed
+ * after each fully successful batch, and the reported done/total counts from
+ * the checkpoint so the progress bar stays continuous across reloads.
  */
 async function discoverPoolsFromFactoryLogs(
   onProgress?: (progress: ScanProgress) => void,
 ): Promise<{ pools: DiscoveredPool[]; complete: boolean }> {
   const head = await publicClient.getBlockNumber();
+  const checkpoint = readPoolCheckpoint();
+  let startBlock = START_BLOCK;
+  let baseChunks = 0;
+  const found: DiscoveredPool[] = [];
+  const seen = new Set<string>();
+  if (
+    checkpoint &&
+    BigInt(checkpoint.lastBlock) >= START_BLOCK - 1n &&
+    BigInt(checkpoint.lastBlock) < head
+  ) {
+    startBlock = BigInt(checkpoint.lastBlock) + 1n;
+    baseChunks = checkpoint.chunksDone;
+    for (const p of rehydratePoolCache({
+      atBlock: checkpoint.lastBlock,
+      pools: checkpoint.pools,
+    })) {
+      found.push(p);
+      seen.add(p.pool.toLowerCase());
+    }
+  }
   const ranges: Array<[bigint, bigint]> = [];
-  for (let from = START_BLOCK; from <= head; from += LOG_CHUNK) {
+  for (let from = startBlock; from <= head; from += LOG_CHUNK) {
     const to = from + LOG_CHUNK - 1n > head ? head : from + LOG_CHUNK - 1n;
     ranges.push([from, to]);
   }
-  const found: DiscoveredPool[] = [];
-  const seen = new Set<string>();
   let done = 0;
   let complete = true;
   const factories = [
@@ -346,9 +453,11 @@ async function discoverPoolsFromFactoryLogs(
         }),
       ),
     );
+    let batchOk = true;
     for (let j = 0; j < results.length; j++) {
       const logs = results[j];
       if (logs === null) {
+        batchOk = false;
         complete = false;
         continue;
       }
@@ -375,9 +484,16 @@ async function discoverPoolsFromFactoryLogs(
       }
     }
     done += batch.length;
-    onProgress?.({ done, total: ranges.length, found: found.length });
-    if (!complete) break;
+    onProgress?.({ done: baseChunks + done, total: baseChunks + ranges.length, found: found.length });
+    // Checkpoint only over fully successful batches, in order — the
+    // checkpoint's lastBlock is always the end of a contiguous scanned prefix.
+    if (batchOk) {
+      writePoolCheckpoint(batch[batch.length - 1][1], baseChunks + done, found);
+    } else {
+      break;
+    }
   }
+  if (complete) clearPoolCheckpoint();
   return { pools: found, complete };
 }
 
@@ -412,6 +528,9 @@ export async function discoverPools(
   if (cached && !forceRefresh) {
     return rehydratePoolCache(cached);
   }
+  // A forced refresh rebuilds from scratch — drop any in-progress checkpoint
+  // so the rescan does not resume from stale partial state.
+  if (forceRefresh) clearPoolCheckpoint();
   try {
     const routes = await getRouteClient();
     const pools = await withTimeout(
@@ -421,6 +540,7 @@ export async function discoverPools(
     );
     const head = await publicClient.getBlockNumber();
     writePoolCache(pools, head);
+    clearPoolCheckpoint();
     return [...pools];
   } catch (sdkError) {
     // SDK discovery threw or timed out (e.g. a verification read on a bad
@@ -447,4 +567,37 @@ export function priceFromSqrt(
   const sqrt = Number(sqrtPrice) / 2 ** 96;
   const price = sqrt * sqrt;
   return price * 10 ** (baseDecimals - quoteDecimals);
+}
+
+/**
+ * Price impact of a launch-curve trade in basis points, mirroring the SDK's
+ * own `cpAmmPriceImpactBps` formula: |execution price - spot price| / spot
+ * price, with spot = sqrtPrice^2 (Q64.96, raw quote-per-base units) and the
+ * execution price from the quoted amounts. `baseForQuote` is true when the
+ * input is the base (launched) token (a sell). `amountIn` must be the
+ * *consumed* amount from the quote (amountLeft excluded), not the requested
+ * amount. Returns null when the impact cannot be computed (zero or negative
+ * inputs) so the UI hides it instead of inventing a number. The fee is not
+ * adjusted for — same as the SDK helper — so the figure is conservative (it
+ * includes the fee drag); the fee is shown separately next to the quote.
+ * (Route quotes already carry the SDK's own `priceImpactBps`; this helper is
+ * only for the curve venue.)
+ */
+export function curvePriceImpactBps(
+  amountIn: bigint,
+  amountOut: bigint,
+  sqrtPrice: bigint,
+  baseForQuote: boolean,
+): bigint | null {
+  if (sqrtPrice <= 0n || amountIn <= 0n || amountOut <= 0n) return null;
+  const Q128 = 1n << 128n;
+  const spotPriceX128 = sqrtPrice * sqrtPrice;
+  const executionNumerator = baseForQuote ? amountOut * Q128 : amountIn * Q128;
+  const executionDenominator = baseForQuote ? amountIn : amountOut;
+  const spotNumerator = spotPriceX128 * executionDenominator;
+  const difference =
+    executionNumerator > spotNumerator
+      ? executionNumerator - spotNumerator
+      : spotNumerator - executionNumerator;
+  return (difference * 10000n) / spotNumerator;
 }
