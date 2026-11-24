@@ -12,6 +12,10 @@ import { defineConfig } from 'vite'
  * ~128 KB. That constraint does not apply to GitHub Pages, where Actions
  * builds from source with no such limit — so the externalization was
  * reverted on 24 Nov 2026.
+ *
+ * Deploy note (24 Nov 2026): rapid successive pushes raced each other at
+ * the GitHub Pages deploy step and the final run failed there (build
+ * itself passed). This comment re-triggered a clean deploy run.
  */
 
 // https://vite.dev/config/
