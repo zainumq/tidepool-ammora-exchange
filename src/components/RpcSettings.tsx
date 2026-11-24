@@ -1,9 +1,10 @@
 /**
- * RPC settings: GIWA Sepolia has a single public RPC, so if it is unreachable
- * from the visitor's network the app would have no way to read the chain.
- * This panel lets the visitor enter their own GIWA Sepolia RPC URL — it is
- * validated (must answer as chain 91342) before it is saved, and the official
- * endpoint always stays as fallback. Saved locally, never sent anywhere.
+ * RPC settings: GIWA Sepolia's public RPCs can be unreachable from the
+ * visitor's network, in which case the app would have no way to read the
+ * chain. This panel lets the visitor enter their own GIWA Sepolia RPC URL
+ * — it is validated (must answer as chain 91342) before it is saved, and
+ * the two public endpoints always stay as fallback. Saved locally, never
+ * sent anywhere.
  */
 import { useState } from "react";
 import {
@@ -47,16 +48,16 @@ export function RpcSettings() {
   };
 
   return (
-    <details className="rpc-settings">
+    <details className="rpc-settings" id="rpc-settings">
       <summary className="muted small">
         RPC: <span className="mono">{custom ?? DEFAULT_RPC_URL}</span>
         {custom ? " (custom)" : " (official)"} · change
       </summary>
       <div className="rpc-body">
         <p className="muted small">
-          GIWA Sepolia has one public RPC. If it is unreachable from your network, paste a compatible
-          GIWA Sepolia RPC URL here — it is checked (must answer as chain 91342) before it is used, and
-          the official endpoint stays as fallback.
+          GIWA Sepolia has two public RPC endpoints, tried in order. If both are unreachable from your network, paste
+          a compatible GIWA Sepolia RPC URL here — it is checked (must answer as chain 91342) before it is used, and
+          the public endpoints stay as fallback.
         </p>
         <div className="rpc-row">
           <input
