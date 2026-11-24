@@ -556,15 +556,18 @@ export async function discoverPools(
 }
 
 /**
- * Spot price (quote per 1 base) implied by a Q64.96 sqrt price, adjusted for
+ * Spot price (quote per 1 base) implied by a Q64.64 sqrt price, adjusted for
  * token decimals. Display only — never used for trade math.
+ *
+ * Ammora sqrtPrice is Q64.64 (verified live on the KPTEST curve 24 Nov 2026),
+ * NOT Uniswap V3's Q64.96 — dividing by 2^96 understates the price by 2^64.
  */
 export function priceFromSqrt(
   sqrtPrice: bigint,
   baseDecimals: number,
   quoteDecimals: number,
 ): number {
-  const sqrt = Number(sqrtPrice) / 2 ** 96;
+  const sqrt = Number(sqrtPrice) / 2 ** 64;
   const price = sqrt * sqrt;
   return price * 10 ** (baseDecimals - quoteDecimals);
 }
@@ -572,7 +575,7 @@ export function priceFromSqrt(
 /**
  * Price impact of a launch-curve trade in basis points, mirroring the SDK's
  * own `cpAmmPriceImpactBps` formula: |execution price - spot price| / spot
- * price, with spot = sqrtPrice^2 (Q64.96, raw quote-per-base units) and the
+ * price, with spot = sqrtPrice^2 (Q64.64, raw quote-per-base units) and the
  * execution price from the quoted amounts. `baseForQuote` is true when the
  * input is the base (launched) token (a sell). `amountIn` must be the
  * *consumed* amount from the quote (amountLeft excluded), not the requested
