@@ -16,6 +16,8 @@ import {
   type TokenInfo,
 } from "../lib/tokens";
 import { TokenIcon } from "./TokenIcon";
+import { Pagination } from "./Pagination";
+import { usePagination } from "../lib/pagination";
 
 
 interface LaunchListProps {
@@ -60,6 +62,8 @@ export function LaunchList({
       );
     });
   }, [launches, query, onlyActive, tokenInfos]);
+
+  const pager = usePagination(filtered.length, `${query}|${onlyActive}`);
 
   return (
     <div className="panel">
@@ -114,7 +118,7 @@ export function LaunchList({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((l) => {
+            {pager.slice(filtered).map((l) => {
               const info = tokenInfos.get(l.token.toLowerCase());
               const state = l.state;
               const price =
@@ -209,6 +213,13 @@ export function LaunchList({
           </tbody>
         </table>
       </div>
+      <Pagination
+        page={pager.page}
+        pageCount={pager.pageCount}
+        total={filtered.length}
+        pageSize={pager.pageSize}
+        onPage={pager.setPage}
+      />
 
       {selected && (
         <CurveTradePanel
