@@ -16,6 +16,11 @@ import { defineConfig } from 'vite'
  * Deploy note (24 Nov 2026): rapid successive pushes raced each other at
  * the GitHub Pages deploy step and the final run failed there (build
  * itself passed). This comment re-triggered a clean deploy run.
+ *
+ * Deploy note 2 (24 Nov 2026): same race again during the identicon push —
+ * the final run (index.css) failed at the deploy step while the previous
+ * run succeeded, leaving the live build without the new icon styles.
+ * This comment re-triggered a clean deploy run for the full tree.
  */
 
 // https://vite.dev/config/
