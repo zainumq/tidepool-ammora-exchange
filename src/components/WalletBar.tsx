@@ -7,6 +7,12 @@ import {
   hasInjectedWallet,
   publicClient,
 } from "../lib/client";
+import {
+  connectWalletConnect,
+  disconnectWalletConnect,
+  getWcProjectId,
+  getWcProvider,
+} from "../lib/walletconnect";
 import { shortAddress } from "../lib/tokens";
 import { describeWalletError } from "../lib/walletError";
 
@@ -20,8 +26,16 @@ export function WalletBar({ account, onAccount }: WalletBarProps) {
   const [error, setError] = useState<string | null>(null);
   const [wrongChain, setWrongChain] = useState(false);
   const [balance, setBalance] = useState<bigint | null>(null);
+  const [connectionType, setConnectionType] = useState<"injected" | "walletconnect" | null>(null);
+  const wcConfigured = getWcProjectId() !== null;
 
   const refreshChain = useCallback(async () => {
+    if (getWcProvider()) {
+      // WalletConnect sessions are scoped to GIWA Sepolia; the injected
+      // wallet's chain is irrelevant while one is active.
+      setWrongChain(false);
+      return;
+    }
     if (!hasInjectedWallet()) return;
     try {
       const ethereum = (
@@ -48,6 +62,7 @@ export function WalletBar({ account, onAccount }: WalletBarProps) {
       }
     ).ethereum;
     const onAccounts = (accounts: unknown) => {
+      if (getWcProvider()) return; // WalletConnect session owns the account
       const list = accounts as string[];
       onAccount(list.length > 0 ? (list[0] as Address) : null);
     };
@@ -88,12 +103,34 @@ export function WalletBar({ account, onAccount }: WalletBarProps) {
       await ensureGiwaSepolia();
       const acc = await connectWallet();
       onAccount(acc);
+      setConnectionType("injected");
       setWrongChain(false);
     } catch (e) {
       setError(describeWalletError(e));
     } finally {
       setBusy(false);
     }
+  };
+
+  const connectWC = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const acc = await connectWalletConnect();
+      onAccount(acc);
+      setConnectionType("walletconnect");
+      setWrongChain(false);
+    } catch (e) {
+      setError(describeWalletError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disconnect = async () => {
+    if (connectionType === "walletconnect") await disconnectWalletConnect();
+    setConnectionType(null);
+    onAccount(null);
   };
 
   const switchChain = async () => {
@@ -119,6 +156,15 @@ export function WalletBar({ account, onAccount }: WalletBarProps) {
         >
           {busy ? "Connecting…" : "Connect wallet"}
         </button>
+        {wcConfigured && (
+          <button
+            className="btn btn-ghost"
+            onClick={connectWC}
+            disabled={busy}
+          >
+            {busy ? "Connecting…" : "WalletConnect"}
+          </button>
+        )}
         {error && <span className="wallet-error">{error}</span>}
       </div>
     );
@@ -135,14 +181,17 @@ export function WalletBar({ account, onAccount }: WalletBarProps) {
           </span>
         )}
       </span>
-      {wrongChain && (
+      {wrongChain && connectionType !== "walletconnect" && (
         <button className="btn btn-warn" onClick={switchChain} disabled={busy}>
           Switch to GIWA Sepolia
         </button>
       )}
+      {connectionType === "walletconnect" && (
+        <span className="muted small">via WalletConnect</span>
+      )}
       <button
         className="btn btn-ghost"
-        onClick={() => onAccount(null)}
+        onClick={() => void disconnect()}
         title="Disconnect (local only — the wallet stays connected in your browser)"
       >
         Disconnect
