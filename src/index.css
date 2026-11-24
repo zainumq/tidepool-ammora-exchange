@@ -493,6 +493,15 @@ ol.wallet-hint {
 .table-wrap {
   overflow-x: auto;
 }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
 .table {
   width: 100%;
   border-collapse: collapse;
