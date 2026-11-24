@@ -57,7 +57,9 @@ export function RpcSettings() {
         <p className="muted small">
           GIWA Sepolia has two public RPC endpoints, tried in order. If both are unreachable from your network, paste
           a compatible GIWA Sepolia RPC URL here — it is checked (must answer as chain 91342) before it is used, and
-          the public endpoints stay as fallback.
+          the public endpoints stay as fallback. A free third endpoint is available from SolidRPC (no card required):
+          create a key at solidrpc.io and paste <span className="mono">https://rpc.solidrpc.io/&lt;key&gt;/evm/91342</span> —
+          the key stays in this browser only.
         </p>
         <div className="rpc-row">
           <input
