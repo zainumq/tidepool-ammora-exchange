@@ -9,31 +9,6 @@
       content="Tidepool — exchange and LP manager built with the Ammora SDK on GIWA Sepolia testnet. Trade launches, swap across Ammora pools, and manage concentrated & compounding LP positions."
     />
     <title>Tidepool — Ammora Exchange &amp; LP Manager (GIWA Sepolia Testnet)</title>
-    <!--
-      Heavy dependencies (React, viem, Ammora SDK) are loaded from CDNs so
-      every file in this build stays under 80 KB (deploy-path limit).
-      Versions are pinned to the exact installed versions.
-      NOTE: esm.sh's build of @ammora-protocol/sdk@0.3.9 is BROKEN (its
-      sdk.mjs contains `export * from ...` inside an arrow function, a
-      syntax error in every browser — verified 24 Nov 2026), so the SDK is
-      loaded as the raw npm artifact from jsDelivr instead. Its bare
-      imports (viem, @ammora-protocol/math) still resolve through this
-      import map, so app and SDK share one viem instance.
-    -->
-    <script type="importmap">
-      {
-        "imports": {
-          "react": "https://esm.sh/react@19.3.1",
-          "react-dom": "https://esm.sh/react-dom@19.3.1",
-          "react-dom/client": "https://esm.sh/react-dom@19.3.1/client",
-          "react/jsx-runtime": "https://esm.sh/react@19.3.1/jsx-runtime",
-          "viem": "https://esm.sh/viem@2.58.4",
-          "viem/utils": "https://esm.sh/viem@2.58.4/utils",
-          "@ammora-protocol/sdk": "https://cdn.jsdelivr.net/npm/@ammora-protocol/sdk@0.3.9/dist/index.js",
-          "@ammora-protocol/math": "https://esm.sh/@ammora-protocol/math@0.3.0"
-        }
-      }
-    </script>
   </head>
   <body>
     <div id="root"></div>
