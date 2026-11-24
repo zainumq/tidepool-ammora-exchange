@@ -19,6 +19,12 @@ import {
 } from "../lib/tokens";
 import { executePlan } from "../lib/tx";
 import { getWalletClient } from "../lib/client";
+import {
+  classifyWalletError,
+  describeWalletError,
+  type WalletErrorKind,
+} from "../lib/walletError";
+import { WalletErrorHint } from "./WalletErrorHint";
 
 interface PoolListProps {
   account: Address | null;
@@ -28,11 +34,11 @@ interface PoolListProps {
   onRefresh: () => void;
 }
 
-type Phase =
+export type Phase =
   | { stage: "idle" }
   | { stage: "working"; message: string }
   | { stage: "done"; hashes: string[]; note: string }
-  | { stage: "error"; message: string };
+  | { stage: "error"; message: string; kind?: WalletErrorKind };
 
 export function PoolList({
   account,
@@ -380,10 +386,9 @@ function OpenPositionForm({
         quoteAmount: q.quoteAmount,
       });
     } catch (e) {
-      setPhase({
-        stage: "error",
-        message: e instanceof Error ? e.message : "Quote failed.",
-      });
+      // A quote failure is a read failure, not a wallet failure: no hint
+      // and no Retry (the Preview button re-runs it).
+      setPhase({ stage: "error", message: describeWalletError(e) });
     }
   };
 
@@ -413,9 +418,11 @@ function OpenPositionForm({
         note: "Position created — find it under My LP.",
       });
     } catch (e) {
+      const classified = classifyWalletError(e);
       setPhase({
         stage: "error",
-        message: e instanceof Error ? e.message : "Failed to create position.",
+        message: classified.message,
+        kind: classified.kind,
       });
     }
   };
@@ -470,7 +477,10 @@ function OpenPositionForm({
       >
         {!account ? "Connect wallet" : "Create position"}
       </button>
-      <PhaseView phase={phase} />
+      <PhaseView
+        phase={phase}
+        onRetry={phase.stage === "error" && phase.kind ? create : undefined}
+      />
     </div>
   );
 }
@@ -517,10 +527,9 @@ function ZapForm({
         minimumLiquidity: plan.quote.minimumLiquidity,
       });
     } catch (e) {
-      setPhase({
-        stage: "error",
-        message: e instanceof Error ? e.message : "Zap preview failed.",
-      });
+      // A preview failure is a read failure, not a wallet failure: no hint
+      // and no Retry (the Preview button re-runs it).
+      setPhase({ stage: "error", message: describeWalletError(e) });
     }
   };
 
@@ -552,9 +561,11 @@ function ZapForm({
         note: "Zap complete — new position is under My LP.",
       });
     } catch (e) {
+      const classified = classifyWalletError(e);
       setPhase({
         stage: "error",
-        message: e instanceof Error ? e.message : "Zap failed.",
+        message: classified.message,
+        kind: classified.kind,
       });
     }
   };
@@ -633,12 +644,21 @@ function ZapForm({
       >
         {!account ? "Connect wallet" : "Zap in"}
       </button>
-      <PhaseView phase={phase} />
+      <PhaseView
+        phase={phase}
+        onRetry={phase.stage === "error" && phase.kind ? zap : undefined}
+      />
     </div>
   );
 }
 
-export function PhaseView({ phase }: { phase: Phase }) {
+export function PhaseView({
+  phase,
+  onRetry,
+}: {
+  phase: Phase;
+  onRetry?: () => void;
+}) {
   if (phase.stage === "idle") return null;
   if (phase.stage === "working") {
     return <p className="status-line">⏳ {phase.message}</p>;
@@ -661,5 +681,15 @@ export function PhaseView({ phase }: { phase: Phase }) {
       </div>
     );
   }
-  return <p className="error-text">❌ {phase.message}</p>;
+  return (
+    <div className="wallet-error-box" role="alert">
+      <p className="error-text">❌ {phase.message}</p>
+      {phase.kind ? <WalletErrorHint kind={phase.kind} /> : null}
+      {onRetry ? (
+        <button type="button" className="btn btn-small" onClick={onRetry}>
+          Retry
+        </button>
+      ) : null}
+    </div>
+  );
 }
