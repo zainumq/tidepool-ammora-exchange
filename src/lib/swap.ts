@@ -36,6 +36,7 @@ import {
 } from "./discovery";
 import { isNative, isWeth, NATIVE_ETH } from "./tokens";
 import { ensureApprovals, sendPlanned } from "./tx";
+import { WALLET_FLOW_TIMEOUT_MS, withWalletTimeout } from "./walletError";
 
 export interface CurveQuote {
   venue: "curve";
@@ -271,13 +272,19 @@ export async function executeRouteTrade(
   onStatus: (message: string) => void,
 ): Promise<{ hash: Hash; amountReceived: bigint | null }> {
   const wallet = getWalletClient();
-  const result = await prepared.execute(wallet, {
-    sendApprovals: true,
-    exactApproval: true,
-    simulate: true,
-    autoRefresh: true,
-    onStatus: (status) => onStatus(describeRouteStatus(status)),
-  });
+  // The SDK's execute runs approvals + swap + receipt waits as one flow;
+  // give the whole flow a generous budget so a hung wallet request still
+  // fails visibly instead of hanging forever.
+  const result = await withWalletTimeout(
+    prepared.execute(wallet, {
+      sendApprovals: true,
+      exactApproval: true,
+      simulate: true,
+      autoRefresh: true,
+      onStatus: (status) => onStatus(describeRouteStatus(status)),
+    }),
+    WALLET_FLOW_TIMEOUT_MS,
+  );
   return { hash: result.hash, amountReceived: result.amountReceived };
 }
 
