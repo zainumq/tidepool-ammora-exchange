@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getAddress, isAddress, type Address } from "viem";
 import { fetchTokenInfo, shortAddress, type TokenInfo } from "../lib/tokens";
+import { TokenIcon } from "./TokenIcon";
 
 interface TokenPickerProps {
   open: boolean;
@@ -109,6 +110,7 @@ export function TokenPicker({
               pasted.address.toLowerCase() === exclude.toLowerCase()
             }
           >
+            <TokenIcon address={pasted.address} size={26} />
             <span className="token-symbol">{pasted.symbol}</span>
             <span className="token-name">
               {pasted.name} · {shortAddress(pasted.address)}
@@ -129,6 +131,7 @@ export function TokenPicker({
               className="token-row"
               onClick={() => choose(t)}
             >
+              <TokenIcon address={t.address} size={26} />
               <span className="token-symbol">{t.symbol}</span>
               <span className="token-name">
                 {t.name} · {shortAddress(t.address)}
