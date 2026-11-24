@@ -15,6 +15,7 @@ import {
   shortAddress,
   type TokenInfo,
 } from "../lib/tokens";
+import { TokenIcon } from "./TokenIcon";
 
 
 interface LaunchListProps {
@@ -129,17 +130,22 @@ export function LaunchList({
                   }
                 >
                   <td>
-                    <strong>{info?.symbol ?? shortAddress(l.token)}</strong>
-                    <div className="muted small">
-                      <a
-                        href={explorerToken(l.token)}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {shortAddress(l.token)} ↗
-                      </a>
-                    </div>
+                    <span className="token-cell">
+                      <TokenIcon address={l.token} size={26} />
+                      <span>
+                        <strong>{info?.symbol ?? shortAddress(l.token)}</strong>
+                        <div className="muted small">
+                          <a
+                            href={explorerToken(l.token)}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {shortAddress(l.token)} ↗
+                          </a>
+                        </div>
+                      </span>
+                    </span>
                   </td>
                   <td className="mono">#{l.configId}</td>
                   <td>
@@ -317,20 +323,23 @@ function CurveTradePanel({
   return (
     <div className="trade-drawer">
       <div className="modal-head">
-        <h3>
-          Trade {base.symbol}
-          <span className="muted small">
-            {" "}
-            · curve{" "}
-            <a
-              href={explorerAddress(launch.curve)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {shortAddress(launch.curve)} ↗
-            </a>
-          </span>
-        </h3>
+        <div className="pair-cell">
+          <TokenIcon address={base.address} size={28} />
+          <h3>
+            Trade {base.symbol}
+            <span className="muted small">
+              {" "}
+              · curve{" "}
+              <a
+                href={explorerAddress(launch.curve)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {shortAddress(launch.curve)} ↗
+              </a>
+            </span>
+          </h3>
+        </div>
         <button className="btn btn-ghost" onClick={onClose}>
           ✕
         </button>
@@ -402,7 +411,10 @@ function CurveTradePanel({
                 setQuote(null);
               }}
             />
-            <span className="token-btn static">{payToken.symbol}</span>
+            <span className="token-btn static">
+              <TokenIcon address={payToken.address} size={20} />
+              {payToken.symbol}
+            </span>
             <button
               className="btn btn-ghost"
               onClick={getQuote}
