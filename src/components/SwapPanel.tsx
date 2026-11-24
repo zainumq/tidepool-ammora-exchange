@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Address } from "viem";
 import { ADDRESSES, erc20Abi, explorerTx } from "../lib/chain";
 import { publicClient } from "../lib/client";
-import type { DiscoveredPool, EnrichedLaunch } from "../lib/discovery";
+import {
+  curvePriceImpactBps,
+  type DiscoveredPool,
+  type EnrichedLaunch,
+} from "../lib/discovery";
 import {
   executeCurveTrade,
   executeRouteTrade,
@@ -361,8 +365,22 @@ export function SwapPanel({
       : quote?.venue === "route"
         ? quote.quote.minimumAmountOut
         : null;
-  const priceImpact =
-    quote?.venue === "route" ? quote.quote.priceImpactBps : null;
+  // Price impact in bps, from the SDK for route quotes and from the curve's
+  // sqrtPrice for curve quotes. Null when it cannot be computed — the row
+  // is then hidden rather than invented. Warning only, never blocks a swap.
+  const priceImpact: bigint | null =
+    quote?.venue === "route"
+      ? quote.quote.priceImpactBps
+      : quote?.venue === "curve" &&
+          venue?.kind === "curve" &&
+          venue.launch.state !== null
+        ? curvePriceImpactBps(
+            quote.amountIn,
+            quote.amountOut,
+            venue.launch.state.sqrtPrice,
+            quote.baseForQuote,
+          )
+        : null;
 
   const insufficient =
     amountRaw !== null &&
@@ -527,6 +545,33 @@ export function SwapPanel({
                 )}
               </span>
             </div>
+            {priceImpact !== null && (
+              <div className="kv">
+                <span>Price impact</span>
+                <span
+                  className={
+                    priceImpact > 500n
+                      ? "impact-danger"
+                      : priceImpact > 100n
+                        ? "impact-warn"
+                        : ""
+                  }
+                >
+                  {formatPct(priceImpact)}
+                </span>
+              </div>
+            )}
+            {priceImpact !== null && priceImpact > 100n && (
+              <p
+                className={
+                  priceImpact > 500n ? "impact-danger" : "impact-warn"
+                }
+              >
+                {priceImpact > 500n
+                  ? "Very high price impact — this trade moves the price a lot. Consider a smaller amount."
+                  : "High price impact — you get noticeably less than the spot price suggests."}
+              </p>
+            )}
             {quote.venue === "curve" && (
               <div className="kv">
                 <span>Curve fee</span>
@@ -549,14 +594,6 @@ export function SwapPanel({
             )}
             {quote.venue === "route" && (
               <>
-                <div className="kv">
-                  <span>Price impact</span>
-                  <span>
-                    {priceImpact !== null
-                      ? formatPct(priceImpact)
-                      : "—"}
-                  </span>
-                </div>
                 <div className="kv">
                   <span>Route</span>
                   <span>{quote.quote.hops.length} hop(s)</span>
