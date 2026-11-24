@@ -12,6 +12,7 @@ import {
 } from "../lib/lp";
 import {
   formatAmount,
+  formatLiquidity,
   formatPct,
   parseAmount,
   shortAddress,
@@ -215,7 +216,13 @@ export function PoolList({
                   </td>
                   <td>{state ? formatPct(state.currentFeeBps) : "—"}</td>
                   <td>
-                    {state ? state.totalLiquidity.toString() : "—"}
+                    {state ? (
+                      <span title={state.totalLiquidity.toString()}>
+                        {formatLiquidity(state.totalLiquidity)}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 </tr>
               );
@@ -312,7 +319,9 @@ function PoolDetail({
           </div>
           <div className="kv">
             <span>Total liquidity</span>
-            <span className="mono">{state.totalLiquidity.toString()}</span>
+            <span className="mono" title={state.totalLiquidity.toString()}>
+              {formatLiquidity(state.totalLiquidity)}
+            </span>
           </div>
           <div className="kv">
             <span>Created</span>
@@ -467,7 +476,9 @@ function OpenPositionForm({
         <div className="quote-details">
           <div className="kv">
             <span>Liquidity minted</span>
-            <strong className="mono">{preview.liquidity.toString()}</strong>
+            <strong className="mono" title={preview.liquidity.toString()}>
+              {formatLiquidity(preview.liquidity)}
+            </strong>
           </div>
           <div className="kv">
             <span>Used</span>
@@ -641,8 +652,8 @@ function ZapForm({
           </div>
           <div className="kv">
             <span>Min. liquidity</span>
-            <span className="mono">
-              {preview.minimumLiquidity.toString()}
+            <span className="mono" title={preview.minimumLiquidity.toString()}>
+              {formatLiquidity(preview.minimumLiquidity)}
             </span>
           </div>
         </div>
