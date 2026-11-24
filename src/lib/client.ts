@@ -33,6 +33,7 @@ import {
   giwaSepolia,
 } from "./chain";
 import { withWalletTimeout } from "./walletError";
+import { getWcProvider } from "./walletconnect";
 
 export const publicClient: PublicClient = createPublicClient({
   chain: giwaSepolia,
@@ -90,6 +91,13 @@ export function hasInjectedWallet(): boolean {
 }
 
 export function getWalletClient(): WalletClient {
+  const wc = getWcProvider();
+  if (wc) {
+    return createWalletClient({
+      chain: giwaSepolia,
+      transport: custom(wc as never),
+    });
+  }
   const ethereum = (window as unknown as { ethereum: unknown }).ethereum;
   return createWalletClient({
     chain: giwaSepolia,
