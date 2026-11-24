@@ -4,6 +4,7 @@ import { LaunchList } from "./components/LaunchList";
 import { LpManager } from "./components/LpManager";
 import { PoolList } from "./components/PoolList";
 import { RpcSettings } from "./components/RpcSettings";
+import { RpcStatusBanner } from "./components/RpcStatusBanner";
 import { SwapPanel } from "./components/SwapPanel";
 import { WalletBar } from "./components/WalletBar";
 import { ADDRESSES, DEPLOYMENT } from "./lib/chain";
@@ -145,6 +146,8 @@ export default function App() {
         </div>
         <WalletBar account={account} onAccount={setAccount} />
       </header>
+
+      <RpcStatusBanner />
 
       <RpcSettings />
 
