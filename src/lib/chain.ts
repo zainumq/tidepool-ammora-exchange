@@ -5,10 +5,11 @@
  * (`giwaSepoliaAutoRouteDeployment`) — nothing here is hand-typed, so the app
  * cannot drift from the reviewed generation.
  *
- * RPC: GIWA Sepolia has a single public RPC (chainlist confirms no second
- * public endpoint), so the app cannot fail over to another public node.
- * Instead it (1) retries each read, (2) always keeps the official endpoint
- * as fallback, and (3) lets the visitor enter their own GIWA Sepolia RPC
+ * RPC: GIWA Sepolia has two public RPC endpoints — the official one and
+ * the Flashblocks one (published in GIWA's docs; verified live 24 Nov
+ * 2026: answers chain 91342, eth_call and eth_getLogs all work, head in
+ * sync with the official RPC). The app tries them in order and retries
+ * each read, and lets the visitor enter their own GIWA Sepolia RPC
  * (validated as chain 91342 before use) — so a blocked or down official
  * RPC never leaves the app with no way to read the chain.
  */
@@ -22,8 +23,15 @@ import {
 import { createPublicClient, defineChain, http, type Address } from "viem";
 
 export const CHAIN_ID = 91342;
-/** The single public GIWA Sepolia RPC — always kept as the last fallback. */
+/** The primary public GIWA Sepolia RPC. */
 export const DEFAULT_RPC_URL = "https://sepolia-rpc.giwa.io";
+/**
+ * Second public GIWA Sepolia RPC (GIWA's Flashblocks endpoint, published in
+ * GIWA's docs). Verified live 24 Nov 2026: eth_chainId 91342, eth_call and
+ * eth_getLogs work, head in sync with the official RPC. Tried only after
+ * the official endpoint fails, so normal reads stay on the canonical RPC.
+ */
+export const FALLBACK_RPC_URL = "https://sepolia-rpc-flashblocks.giwa.io";
 /** Kept for existing imports; the effective list lives in getRpcUrls(). */
 export const RPC_URL = DEFAULT_RPC_URL;
 export const EXPLORER_URL = "https://sepolia-explorer.giwa.io";
@@ -89,10 +97,12 @@ export function getCustomRpcUrl(): string | null {
   }
 }
 
-/** Effective RPC list: a validated custom endpoint first, official endpoint always last. */
+/** Effective RPC list: a validated custom endpoint first, then the two public endpoints in order. */
 export function getRpcUrls(): string[] {
   const custom = getCustomRpcUrl();
-  return custom && custom !== DEFAULT_RPC_URL ? [custom, DEFAULT_RPC_URL] : [DEFAULT_RPC_URL];
+  const urls = [DEFAULT_RPC_URL, FALLBACK_RPC_URL];
+  if (custom && !urls.includes(custom)) return [custom, ...urls];
+  return urls;
 }
 
 export function setCustomRpcUrl(url: string): void {
