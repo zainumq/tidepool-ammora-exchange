@@ -7,11 +7,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test": "vitest run",
     "preview": "vite preview",
     "typecheck": "tsc -b"
   },
   "dependencies": {
     "@ammora-protocol/sdk": "0.3.9",
+    "@walletconnect/ethereum-provider": "^2.26.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "viem": "2.58.4"
@@ -23,7 +25,8 @@
     "@vitejs/plugin-react": "^6.1.2",
     "oxlint": "^1.90.0",
     "typescript": "~7.0.2",
-    "vite": "^8.3.6"
+    "vite": "^8.3.6",
+    "vitest": "^5.1.1"
   },
-  "description": "Tidepool \u2014 exchange & LP manager built with the Ammora SDK on GIWA Sepolia testnet"
+  "description": "Tidepool — exchange & LP manager built with the Ammora SDK on GIWA Sepolia testnet"
 }
