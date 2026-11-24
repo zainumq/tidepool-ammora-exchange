@@ -25,6 +25,7 @@ import {
   type WalletErrorKind,
 } from "../lib/walletError";
 import { WalletErrorHint } from "./WalletErrorHint";
+import { TokenIcon } from "./TokenIcon";
 
 interface PoolListProps {
   account: Address | null;
@@ -170,13 +171,21 @@ export function PoolList({
                   }
                 >
                   <td>
-                    <strong>
-                      {base?.symbol ?? shortAddress(p.baseToken)} /{" "}
-                      {quote?.symbol ?? shortAddress(p.quoteToken)}
-                    </strong>
-                    <div className="muted small mono">
-                      {shortAddress(p.pool)}
-                    </div>
+                    <span className="pair-cell">
+                      <span className="token-pair">
+                        <TokenIcon address={p.baseToken} size={24} />
+                        <TokenIcon address={p.quoteToken} size={24} />
+                      </span>
+                      <span>
+                        <strong>
+                          {base?.symbol ?? shortAddress(p.baseToken)} /{" "}
+                          {quote?.symbol ?? shortAddress(p.quoteToken)}
+                        </strong>
+                        <div className="muted small mono">
+                          {shortAddress(p.pool)}
+                        </div>
+                      </span>
+                    </span>
                   </td>
                   <td>
                     <span className="badge badge-live">{p.model}</span>
@@ -250,21 +259,27 @@ function PoolDetail({
   return (
     <div className="trade-drawer">
       <div className="modal-head">
-        <h3>
-          {base?.symbol ?? shortAddress(pool.baseToken)} /{" "}
-          {quote?.symbol ?? shortAddress(pool.quoteToken)}
-          <span className="muted small">
-            {" "}
-            · {pool.model} ·{" "}
-            <a
-              href={explorerAddress(pool.pool)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {shortAddress(pool.pool)} ↗
-            </a>
+        <div className="pair-cell">
+          <span className="token-pair">
+            <TokenIcon address={pool.baseToken} size={28} />
+            <TokenIcon address={pool.quoteToken} size={28} />
           </span>
-        </h3>
+          <h3>
+            {base?.symbol ?? shortAddress(pool.baseToken)} /{" "}
+            {quote?.symbol ?? shortAddress(pool.quoteToken)}
+            <span className="muted small">
+              {" "}
+              · {pool.model} ·{" "}
+              <a
+                href={explorerAddress(pool.pool)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {shortAddress(pool.pool)} ↗
+              </a>
+            </span>
+          </h3>
+        </div>
         <button className="btn btn-ghost" onClick={onClose}>
           ✕
         </button>
