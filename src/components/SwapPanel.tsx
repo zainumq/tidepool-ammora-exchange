@@ -29,6 +29,7 @@ import {
 } from "../lib/walletError";
 import { WalletErrorHint } from "./WalletErrorHint";
 import { TokenPicker } from "./TokenPicker";
+import { TokenIcon } from "./TokenIcon";
 
 interface SwapPanelProps {
   account: Address | null;
@@ -417,6 +418,7 @@ export function SwapPanel({
             className="token-btn"
             onClick={() => setPicker("in")}
           >
+            <TokenIcon address={tokenIn.address} size={22} />
             {tokenIn.symbol} ▾
           </button>
         </div>
@@ -450,7 +452,14 @@ export function SwapPanel({
             className="token-btn"
             onClick={() => setPicker("out")}
           >
-            {tokenOut ? `${tokenOut.symbol} ▾` : "Select token ▾"}
+            {tokenOut ? (
+              <>
+                <TokenIcon address={tokenOut.address} size={22} />
+                {tokenOut.symbol} ▾
+              </>
+            ) : (
+              "Select token ▾"
+            )}
           </button>
         </div>
 
