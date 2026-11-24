@@ -32,6 +32,7 @@ import {
   getRpcUrls,
   giwaSepolia,
 } from "./chain";
+import { withWalletTimeout } from "./walletError";
 
 export const publicClient: PublicClient = createPublicClient({
   chain: giwaSepolia,
@@ -99,7 +100,9 @@ export function getWalletClient(): WalletClient {
 /** Request accounts from the injected wallet. Returns the first account. */
 export async function connectWallet(): Promise<Address> {
   const wallet = getWalletClient();
-  const [account] = await wallet.requestAddresses();
+  // The account prompt can hang like any wallet request (popup never
+  // appears) — fail visibly instead of hanging forever.
+  const [account] = await withWalletTimeout(wallet.requestAddresses());
   return account;
 }
 
@@ -116,24 +119,28 @@ export async function ensureGiwaSepolia(): Promise<void> {
     }
   ).ethereum;
   try {
-    await ethereum.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: `0x${CHAIN_ID.toString(16)}` }],
-    });
+    await withWalletTimeout(
+      ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: `0x${CHAIN_ID.toString(16)}` }],
+      }),
+    );
   } catch (error: unknown) {
     const code = (error as { code?: number }).code;
     if (code !== 4902) throw error;
-    await ethereum.request({
-      method: "wallet_addEthereumChain",
-      params: [
-        {
-          chainId: `0x${CHAIN_ID.toString(16)}`,
-          chainName: "GIWA Sepolia",
-          nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-          rpcUrls: getRpcUrls(),
-          blockExplorerUrls: ["https://sepolia-explorer.giwa.io"],
-        },
-      ],
-    });
+    await withWalletTimeout(
+      ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [
+          {
+            chainId: `0x${CHAIN_ID.toString(16)}`,
+            chainName: "GIWA Sepolia",
+            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+            rpcUrls: getRpcUrls(),
+            blockExplorerUrls: ["https://sepolia-explorer.giwa.io"],
+          },
+        ],
+      }),
+    );
   }
 }
