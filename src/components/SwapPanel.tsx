@@ -23,6 +23,11 @@ import {
   shortAddress,
   type TokenInfo,
 } from "../lib/tokens";
+import {
+  classifyWalletError,
+  type WalletErrorKind,
+} from "../lib/walletError";
+import { WalletErrorHint } from "./WalletErrorHint";
 import { TokenPicker } from "./TokenPicker";
 
 interface SwapPanelProps {
@@ -36,7 +41,15 @@ type TxPhase =
   | { stage: "idle" }
   | { stage: "working"; message: string }
   | { stage: "done"; hashes: string[]; note: string }
-  | { stage: "error"; message: string };
+  | {
+      stage: "error";
+      message: string;
+      kind: WalletErrorKind;
+      /** Which step failed — Retry resumes from there instead of
+       * re-running the whole flow (a swap that already succeeded must
+       * never run twice). */
+      failedStep?: "wrap" | "swap" | "unwrap";
+    };
 
 const SLIPPAGE_PRESETS = [10, 50, 100]; // bps
 
@@ -59,6 +72,12 @@ export function SwapPanel({
   const [balanceOut, setBalanceOut] = useState<bigint | null>(null);
   const [phase, setPhase] = useState<TxPhase>({ stage: "idle" });
   const quoteSeq = useRef(0);
+  // Context for resuming an unwrap that failed after the swap succeeded:
+  // the WETH balance before the swap (the received amount is the delta)
+  // plus the hashes already produced by this attempt.
+  const unwrapRef = useRef<{ wethBefore: bigint; hashes: string[] } | null>(
+    null,
+  );
 
   const amountRaw = useMemo(
     () => parseAmount(amountIn, tokenIn.decimals),
@@ -189,12 +208,28 @@ export function SwapPanel({
   const execute = async () => {
     if (!account || !tokenOut || !quote || !amountRaw) return;
     setPhase({ stage: "working", message: "Starting swap…" });
+    unwrapRef.current = null;
     const hashes: string[] = [];
+    let step: "wrap" | "swap" | "unwrap" = isNative(tokenIn.address)
+      ? "wrap"
+      : "swap";
     try {
-      // Step 1: wrap native ETH into WETH when paying with ETH.
+      // Step 1: wrap native ETH into WETH when paying with ETH — only the
+      // shortfall. Skipping the wrap when the wallet already holds enough
+      // WETH saves a signature, and it makes Retry safe: a retry after a
+      // failed swap does not wrap the same amount a second time.
       if (isNative(tokenIn.address)) {
-        setPhase({ stage: "working", message: "Wrapping ETH → WETH…" });
-        hashes.push(await wrapEth(account, amountRaw));
+        const wethBal = await publicClient.readContract({
+          abi: erc20Abi,
+          address: ADDRESSES.weth,
+          functionName: "balanceOf",
+          args: [account],
+        });
+        const shortfall = amountRaw > wethBal ? amountRaw - wethBal : 0n;
+        if (shortfall > 0n) {
+          setPhase({ stage: "working", message: "Wrapping ETH → WETH…" });
+          hashes.push(await wrapEth(account, shortfall));
+        }
       }
 
       let receivedWeth: bigint | null = null;
@@ -209,6 +244,7 @@ export function SwapPanel({
       }
 
       // Step 2: the swap itself.
+      step = "swap";
       if (quote.venue === "curve") {
         const hs = await executeCurveTrade(
           quote,
@@ -229,6 +265,10 @@ export function SwapPanel({
 
       // Step 3: unwrap WETH back to ETH when the user asked for ETH out.
       if (isNative(tokenOut.address)) {
+        step = "unwrap";
+        if (wethBefore !== null) {
+          unwrapRef.current = { wethBefore, hashes: [...hashes] };
+        }
         let toUnwrap = receivedWeth;
         if (toUnwrap === null && wethBefore !== null) {
           const wethAfter = await publicClient.readContract({
@@ -245,6 +285,7 @@ export function SwapPanel({
         }
       }
 
+      unwrapRef.current = null;
       setPhase({
         stage: "done",
         hashes,
@@ -254,9 +295,55 @@ export function SwapPanel({
       setQuote(null);
       fetchBalances();
     } catch (e) {
+      const classified = classifyWalletError(e);
+      if (step === "unwrap" && unwrapRef.current) {
+        unwrapRef.current.hashes = [...hashes];
+      }
       setPhase({
         stage: "error",
-        message: e instanceof Error ? e.message : "Swap failed.",
+        message: classified.message,
+        kind: classified.kind,
+        failedStep: step,
+      });
+    }
+  };
+
+  /** Resume only the unwrap step after the swap already succeeded. */
+  const retryUnwrap = async () => {
+    if (!account || !unwrapRef.current) return;
+    setPhase({ stage: "working", message: "Unwrapping WETH → ETH…" });
+    try {
+      const { wethBefore, hashes } = unwrapRef.current;
+      const wethAfter = await publicClient.readContract({
+        abi: erc20Abi,
+        address: ADDRESSES.weth,
+        functionName: "balanceOf",
+        args: [account],
+      });
+      const toUnwrap = wethAfter > wethBefore ? wethAfter - wethBefore : 0n;
+      const all = [...hashes];
+      if (toUnwrap > 0n) {
+        all.push(await unwrapWeth(account, toUnwrap));
+      }
+      unwrapRef.current = null;
+      setPhase({
+        stage: "done",
+        hashes: all,
+        note:
+          toUnwrap > 0n
+            ? "Unwrapped the received WETH back to ETH."
+            : "Nothing left to unwrap — the swap already settled.",
+      });
+      setAmountIn("");
+      setQuote(null);
+      fetchBalances();
+    } catch (e) {
+      const classified = classifyWalletError(e);
+      setPhase({
+        stage: "error",
+        message: classified.message,
+        kind: classified.kind,
+        failedStep: "unwrap",
       });
     }
   };
@@ -489,7 +576,8 @@ export function SwapPanel({
             )}
             {isNative(tokenIn.address) && (
               <p className="muted">
-                ETH is wrapped to WETH automatically as part of this swap.
+                ETH is wrapped to WETH automatically when your WETH balance
+                is short — only the missing amount is wrapped.
               </p>
             )}
             {isNative(tokenOut.address) && (
@@ -546,7 +634,21 @@ export function SwapPanel({
           </div>
         )}
         {phase.stage === "error" && (
-          <p className="error-text">❌ {phase.message}</p>
+          <div className="wallet-error-box" role="alert">
+            <p className="error-text">❌ {phase.message}</p>
+            <WalletErrorHint kind={phase.kind} />
+            <button
+              type="button"
+              className="btn btn-small"
+              onClick={
+                phase.failedStep === "unwrap" ? retryUnwrap : execute
+              }
+            >
+              {phase.failedStep === "unwrap"
+                ? "Retry unwrap"
+                : "Retry swap"}
+            </button>
+          </div>
         )}
       </div>
 
