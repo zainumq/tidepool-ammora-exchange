@@ -26,6 +26,11 @@ import { defineConfig } from 'vite'
  * deploy step ("No artifacts named 'github-pages'", 22 detik) — same
  * transient artifact-metadata flakiness, not a code problem. Retried
  * after a few minutes' pause.
+ *
+ * Deploy note 4 (24 Nov 2026): same race again during the priority-fixes
+ * batch-4 push — the live site served an intermediate build (new
+ * index.html with OG tags, old JS/CSS). This comment re-triggered a
+ * clean deploy run for the full tree.
  */
 
 // https://vite.dev/config/
