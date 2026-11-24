@@ -7,6 +7,7 @@ import { RpcSettings } from "./components/RpcSettings";
 import { RpcStatusBanner } from "./components/RpcStatusBanner";
 import { SwapPanel } from "./components/SwapPanel";
 import { WalletBar } from "./components/WalletBar";
+import { WalletConnectSettings } from "./components/WalletConnectSettings";
 import { ADDRESSES, DEPLOYMENT } from "./lib/chain";
 import {
   discoverPools,
@@ -150,6 +151,8 @@ export default function App() {
       <RpcStatusBanner />
 
       <RpcSettings />
+
+      <WalletConnectSettings />
 
       <nav className="tabs">
         {(
