@@ -8,6 +8,7 @@ import {
   publicClient,
 } from "../lib/client";
 import { shortAddress } from "../lib/tokens";
+import { describeWalletError } from "../lib/walletError";
 
 interface WalletBarProps {
   account: Address | null;
@@ -89,9 +90,7 @@ export function WalletBar({ account, onAccount }: WalletBarProps) {
       onAccount(acc);
       setWrongChain(false);
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Could not connect the wallet.",
-      );
+      setError(describeWalletError(e));
     } finally {
       setBusy(false);
     }
@@ -104,7 +103,7 @@ export function WalletBar({ account, onAccount }: WalletBarProps) {
       await ensureGiwaSepolia();
       setWrongChain(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not switch network.");
+      setError(describeWalletError(e));
     } finally {
       setBusy(false);
     }
