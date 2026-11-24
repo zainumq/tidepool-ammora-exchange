@@ -29,6 +29,7 @@ import {
   describeWalletError,
 } from "../lib/walletError";
 import { PhaseView, type Phase } from "./PoolList";
+import { TokenIcon } from "./TokenIcon";
 
 interface LpManagerProps {
   account: Address | null;
@@ -192,10 +193,16 @@ function PositionCard({
   return (
     <div className="position-card">
       <div className="position-head">
-        <strong>
-          {base?.symbol ?? shortAddress(position.poolState.baseToken)} /{" "}
-          {quote?.symbol ?? shortAddress(position.poolState.quoteToken)}
-        </strong>
+        <span className="pair-cell">
+          <span className="token-pair">
+            <TokenIcon address={position.poolState.baseToken} size={24} />
+            <TokenIcon address={position.poolState.quoteToken} size={24} />
+          </span>
+          <strong>
+            {base?.symbol ?? shortAddress(position.poolState.baseToken)} /{" "}
+            {quote?.symbol ?? shortAddress(position.poolState.quoteToken)}
+          </strong>
+        </span>
         <span className="badge badge-live">{position.kind}</span>
       </div>
       <div className="muted small">
