@@ -42,6 +42,11 @@ import { defineConfig } from 'vite'
  * commits (tokens.ts + PoolList.tsx) did not reach the live site; the
  * live bundle stayed on the priceFromSqrt build. This comment re-triggered
  * a clean deploy run for the full tree.
+ *
+ * Deploy note 7 (24 Nov 2026): the note-6 re-trigger ALSO failed to deploy
+ * (live bundle still the priceFromSqrt build 7 minutes later) — same
+ * transient artifact flakiness as the identicon batch, where the second
+ * re-trigger after a pause succeeded. Retried after a pause.
  */
 
 // https://vite.dev/config/
