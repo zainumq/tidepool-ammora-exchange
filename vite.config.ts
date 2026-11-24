@@ -21,6 +21,11 @@ import { defineConfig } from 'vite'
  * the final run (index.css) failed at the deploy step while the previous
  * run succeeded, leaving the live build without the new icon styles.
  * This comment re-triggered a clean deploy run for the full tree.
+ *
+ * Deploy note 3 (24 Nov 2026): the note-2 re-trigger ALSO failed at the
+ * deploy step ("No artifacts named 'github-pages'", 22 detik) — same
+ * transient artifact-metadata flakiness, not a code problem. Retried
+ * after a few minutes' pause.
  */
 
 // https://vite.dev/config/
