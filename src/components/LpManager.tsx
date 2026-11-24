@@ -24,7 +24,11 @@ import {
   type TokenInfo,
 } from "../lib/tokens";
 import { executePlan } from "../lib/tx";
-import { PhaseView } from "./PoolList";
+import {
+  classifyWalletError,
+  describeWalletError,
+} from "../lib/walletError";
+import { PhaseView, type Phase } from "./PoolList";
 
 interface LpManagerProps {
   account: Address | null;
@@ -32,12 +36,6 @@ interface LpManagerProps {
   tokenInfos: Map<string, TokenInfo>;
   poolsLoaded: boolean;
 }
-
-type Phase =
-  | { stage: "idle" }
-  | { stage: "working"; message: string }
-  | { stage: "done"; hashes: string[]; note: string }
-  | { stage: "error"; message: string };
 
 export function LpManager({
   account,
@@ -431,9 +429,11 @@ function AddForm({
       });
       onDone();
     } catch (e) {
+      const classified = classifyWalletError(e);
       setPhase({
         stage: "error",
-        message: e instanceof Error ? e.message : "Add failed.",
+        message: classified.message,
+        kind: classified.kind,
       });
     }
   };
@@ -466,7 +466,10 @@ function AddForm({
       >
         Add liquidity
       </button>
-      <PhaseView phase={phase} />
+      <PhaseView
+        phase={phase}
+        onRetry={phase.stage === "error" && phase.kind ? submit : undefined}
+      />
     </div>
   );
 }
@@ -503,10 +506,9 @@ function RemoveForm({
       const q = await quoteRemove(position.pool, position.kind, liquidity, 50);
       setPreview({ baseAmount: q.baseAmount, quoteAmount: q.quoteAmount });
     } catch (e) {
-      setPhase({
-        stage: "error",
-        message: e instanceof Error ? e.message : "Quote failed.",
-      });
+      // A quote failure is a read failure, not a wallet failure: no hint
+      // and no Retry (the Preview button re-runs it).
+      setPhase({ stage: "error", message: describeWalletError(e) });
     }
   };
 
@@ -535,9 +537,11 @@ function RemoveForm({
       });
       onDone();
     } catch (e) {
+      const classified = classifyWalletError(e);
       setPhase({
         stage: "error",
-        message: e instanceof Error ? e.message : "Remove failed.",
+        message: classified.message,
+        kind: classified.kind,
       });
     }
   };
@@ -578,7 +582,10 @@ function RemoveForm({
       >
         Remove liquidity
       </button>
-      <PhaseView phase={phase} />
+      <PhaseView
+        phase={phase}
+        onRetry={phase.stage === "error" && phase.kind ? submit : undefined}
+      />
     </div>
   );
 }
@@ -624,9 +631,11 @@ function ClaimForm({
       });
       onDone();
     } catch (e) {
+      const classified = classifyWalletError(e);
       setPhase({
         stage: "error",
-        message: e instanceof Error ? e.message : "Claim failed.",
+        message: classified.message,
+        kind: classified.kind,
       });
     }
   };
@@ -653,7 +662,10 @@ function ClaimForm({
       >
         Claim fees
       </button>
-      <PhaseView phase={phase} />
+      <PhaseView
+        phase={phase}
+        onRetry={phase.stage === "error" && phase.kind ? submit : undefined}
+      />
     </div>
   );
 }
@@ -672,8 +684,11 @@ function DelegateForm({
     "claim-fee",
   );
   const [phase, setPhase] = useState<Phase>({ stage: "idle" });
+  // Whether the last submit was a revoke, so Retry re-runs the same side.
+  const [lastRevoke, setLastRevoke] = useState(false);
 
   const submit = async (revoke: boolean) => {
+    setLastRevoke(revoke);
     const target = revoke
       ? "0x0000000000000000000000000000000000000000"
       : isAddress(delegate.trim())
@@ -716,9 +731,11 @@ function DelegateForm({
       });
       onDone();
     } catch (e) {
+      const classified = classifyWalletError(e);
       setPhase({
         stage: "error",
-        message: e instanceof Error ? e.message : "Delegation failed.",
+        message: classified.message,
+        kind: classified.kind,
       });
     }
   };
@@ -767,7 +784,14 @@ function DelegateForm({
           Revoke current
         </button>
       </div>
-      <PhaseView phase={phase} />
+      <PhaseView
+        phase={phase}
+        onRetry={
+          phase.stage === "error" && phase.kind
+            ? () => submit(lastRevoke)
+            : undefined
+        }
+      />
     </div>
   );
 }
@@ -820,9 +844,11 @@ function SplitForm({
       });
       onDone();
     } catch (e) {
+      const classified = classifyWalletError(e);
       setPhase({
         stage: "error",
-        message: e instanceof Error ? e.message : "Split failed.",
+        message: classified.message,
+        kind: classified.kind,
       });
     }
   };
@@ -855,7 +881,10 @@ function SplitForm({
       >
         Split position
       </button>
-      <PhaseView phase={phase} />
+      <PhaseView
+        phase={phase}
+        onRetry={phase.stage === "error" && phase.kind ? submit : undefined}
+      />
     </div>
   );
 }
