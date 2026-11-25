@@ -740,6 +740,12 @@ ol.wallet-hint {
   .table {
     font-size: 0.85rem;
   }
+
+  /* Mobile nav tabs wrap instead of hiding the last tabs behind a scroll. */
+  .tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
 }
 
 .btn-small {
