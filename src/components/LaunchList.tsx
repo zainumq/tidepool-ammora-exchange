@@ -86,7 +86,7 @@ export function LaunchList({
       <div className="filter-row">
         <input
           className="input"
-          placeholder="Search symbol, name, address, or config id"
+          placeholder="Search token, address, or config"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
